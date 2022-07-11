@@ -1,0 +1,61 @@
+<?php
+
+namespace App\Import;
+
+use App\Models\Customer;
+use App\Models\usuarios;
+use App\Tools\Sanitize;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+
+set_time_limit(0);
+class CustomerImport
+{
+    protected $usuarios;
+    protected $sanatize;
+
+    public function __construct(Usuarios $usuarios, Sanitize $sanatize)
+    {
+        $this->usuarios = $usuarios;
+        $this->sanatize = $sanatize;
+    }
+
+    public function allData(Request $request)
+    {
+        //insert usuarios in the database
+        $read = IOFactory::load($request->file);
+
+        $sheetCount = $read->getSheetCount();
+        for ($i = 0; $i < $sheetCount; $i++) {
+            $data = $read->getSheet($i)->toArray();
+
+            $line=0;
+            $created=0;
+
+            foreach($data as $item){
+                $usuario = Usuarios::where('tbusuarios_login', $item[0])->first();
+                if ($usuario) {
+                    $senha_format = explode('/', $item[1]);
+
+                    if (strlen($senha_format[0]) == 1) $senha_format[0] = '0'.$senha_format[0];
+                    if (strlen($senha_format[1]) == 1) $senha_format[1] = '0'.$senha_format[1];
+
+                    $senha = $senha_format[1] . $senha_format[0] . $senha_format[2];
+
+                    $usuario->update([
+                        'tbusuarios_senha' => $senha,
+                    ]);
+
+                    $created++;
+                    $line++;
+                }
+            }
+        }
+        $notification = [
+            'message'=> "worksheet_imported",
+            'created'=> $created,
+        ];
+    }
+}

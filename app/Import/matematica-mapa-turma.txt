@@ -1,0 +1,61 @@
+<?php
+
+namespace App\Import;
+
+use App\Models\Customer;
+use App\Models\Bncc;
+use App\Tools\Sanitize;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+
+set_time_limit(0);
+class CustomerImport
+{
+    protected $bncc;
+    protected $sanatize;
+
+    public function __construct(Bncc $bncc, Sanitize $sanatize)
+    {
+        $this->bncc = $bncc;
+        $this->sanatize = $sanatize;
+    }
+
+    public function allData(Request $request)
+    {
+        //insert bncc in the database
+        $read = IOFactory::load($request->file);
+
+        $sheetCount = $read->getSheetCount();
+        for ($i = 0; $i < $sheetCount; $i++) {
+            if ($i == 1) {
+                $data = $read->getSheet($i)->toArray();
+
+                $line=0;
+
+                foreach($data as $item){
+                    if($line>1){
+                        if ($item[0] != '') {
+                            $item[1] = str_replace(' ', '', $item[1], $count);
+
+                            $bncc = Bncc::query()
+                                ->where('habilidades', 'like', '%'.$item[1].'%')
+                                ->update([
+                                    'mapa_turma' => 1
+                                ]);
+                            
+                            // dump($item);
+                        }
+                    }
+                    $line++;
+                }
+                dd('oi');
+            }
+        }
+        $notification = [
+            'message'=> "worksheet_imported",
+            // 'created'=> $created,
+        ];
+    }
+}

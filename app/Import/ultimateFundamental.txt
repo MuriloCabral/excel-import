@@ -1,0 +1,179 @@
+<?php
+
+namespace App\Import;
+
+use App\Models\Customer;
+use App\Models\Bncc;
+use App\Tools\Sanitize;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+
+class CustomerImport
+{
+    protected $bncc;
+    protected $sanatize;
+
+    public function __construct(Bncc $bncc, Sanitize $sanatize)
+    {
+        $this->bncc = $bncc;
+        $this->sanatize = $sanatize;
+    }
+
+    public function allData(Request $request)
+    {
+        //insert bncc in the database
+        // dd($request);
+        $read = IOFactory::load($request->file);
+
+        $sheetCount = $read->getSheetCount();
+        for ($i = 0; $i < $sheetCount; $i++) {
+            if ($i == 13 || $i == 15 || $i == 17 || $i == 19 || $i == 21 || $i == 23 || $i == 25 || $i == 27 || $i == 29) { 
+                $data = $read->getSheet($i)->toArray();
+
+                $line=0;
+                $created=0;
+                
+                foreach($data as $item){
+                    if($line>2){
+                        if ($item[0] != '') {
+
+                            $arraySeries1 = explode(',', $item[1]);
+                            $arraySeries2 = explode(';', $item[1]);
+                            $arraySeries3 = [$item[1]];
+
+                            if (count($arraySeries1) > 1) {
+                                $arraySeries = $arraySeries1;
+                            } else if (count($arraySeries2) > 1) {
+                                $arraySeries = $arraySeries2;
+                            } else {
+                                $arraySeries = $arraySeries3;
+                            }
+                            
+                            $series = [];
+
+                            foreach($arraySeries as $serie) {
+                                switch (trim($serie)) {
+                                    case '1º':
+                                        $serie = 1;
+                                        $tipo_bncc = 1;
+                                        break;
+                                    case '2º':
+                                        $serie = 2;
+                                        $tipo_bncc = 1;
+                                        break;
+                                    case '3º':
+                                        $serie = 3;
+                                        $tipo_bncc = 1;
+                                        break;
+                                    case '4º':
+                                        $serie = 4;
+                                        $tipo_bncc = 1;
+                                        break;
+                                    case '5º':
+                                        $serie = 5;
+                                        $tipo_bncc = 1;
+                                        break;
+                                    case '6º':
+                                        $serie = 6;
+                                        $tipo_bncc = 2;
+                                        break;
+                                    case '7º':
+                                        $serie = 7;
+                                        $tipo_bncc = 2;
+                                        break;
+                                    case '8º':
+                                        $serie = 8;
+                                        $tipo_bncc = 2;
+                                        break;
+                                    case '9º':
+                                        $serie = 9;
+                                        $tipo_bncc = 2;
+                                        break;
+                                    default:
+                                        $serie = null;
+                                        $tipo_bncc = 2;
+                                        break;
+                                }
+                                if ($serie != null) {
+                                    array_push($series, $serie);
+                                }
+                            }
+
+                            $series = array_map( function ($serie) {
+                                return $serie;
+                            }, $series);
+
+                            switch (trim($item[0])) {
+                                case 'Língua Portuguesa':
+                                    $disciplina = 1;
+                                    break;
+                                case 'Educação Física':
+                                    $disciplina = 6;
+                                    $tipo_bncc = 2;
+                                    break;
+                                case 'Matemática':
+                                    $disciplina = 4;
+                                    break;
+                                case 'Ciências':
+                                    $disciplina = 5;
+                                    break;
+                                case 'Geografia':
+                                    $disciplina = 3;
+                                    break;
+                                case 'História':
+                                    $disciplina = 2;
+                                    break;
+                                case 'Arte':
+                                    $disciplina = 7;
+                                    $tipo_bncc = 2;
+                                break;
+                                case 'Língua Inglesa':
+                                    $disciplina = 8;
+                                    $tipo_bncc = 2;
+                                    break;
+                                default:
+                                    $disciplina = null;
+                                    break;
+                            }
+
+                            if ($i == 13 || $i == 19) {
+                                $bncc = $this->bncc->firstOrCreate([
+                                    'tipo_bncc'                 => $tipo_bncc,
+                                    'disciplina'                => $disciplina,
+                                    'componente'                => trim($item[0]),
+                                    'ano_faixa'                 => trim($item[1]),
+                                    'campos_de_atuacao'         => trim($item[2]),
+                                    'praticas_de_linguagem'     => trim($item[3]),
+                                    'objetos_de_conhecimento'   => trim($item[4]),
+                                    'habilidades'               => trim($item[5]),
+                                ]);
+
+                                $bncc->bnccSeries()->sync($series);
+                            } else {
+                                $bncc = $this->bncc->firstOrCreate([
+                                    'tipo_bncc'                 => $tipo_bncc,
+                                    'disciplina'                => $disciplina,
+                                    'componente'                => trim($item[0]),
+                                    'ano_faixa'                 => trim($item[1]),
+                                    'campos_de_atuacao'         => trim($item[2]),
+                                    'praticas_de_linguagem'     => null,
+                                    'objetos_de_conhecimento'   => trim($item[3]),
+                                    'habilidades'               => trim($item[4]),
+                                ]);
+                                $bncc->bnccSeries()->sync($series);
+                            }
+                            $created++;
+                        }
+                    }
+                    $line++;
+                }
+            }
+        }
+        $notification = [
+            'message'=> "worksheet_imported",
+            'created'=> $created,
+        ];
+    }
+}

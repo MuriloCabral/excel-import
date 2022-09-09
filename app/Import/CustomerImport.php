@@ -4,6 +4,10 @@ namespace App\Import;
 
 use App\Models\Customer;
 use App\Models\Bncc;
+use App\Models\Cargo;
+use App\Models\FuncaoLaboral;
+use App\Models\Funcionario;
+use App\Models\Pessoa;
 use App\Tools\Sanitize;
 use Exception;
 use Illuminate\Http\Request;
@@ -13,83 +17,64 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 set_time_limit(0);
 class CustomerImport
 {
-    protected $bncc;
+    protected $funcionario;
     protected $sanatize;
 
-    public function __construct(Bncc $bncc, Sanitize $sanatize)
-    {
-        $this->bncc = $bncc;
-        $this->sanatize = $sanatize;
-    }
+    // public function __construct(Funcionario $funcionario, Sanitize $sanatize)
+    // {
+    //     $this->funcionario = $funcionario;
+    //     $this->sanatize = $sanatize;
+    // }
 
     public function allData(Request $request)
     {
-        //insert bncc in the database
         $read = IOFactory::load($request->file);
 
         $sheetCount = $read->getSheetCount();
         for ($i = 0; $i < $sheetCount; $i++) {
-            if ($i == 0) {
+            if ($i == 1) {
                 $data = $read->getSheet($i)->toArray();
 
                 $line=0;
                 $created=0;
+                $alterados=0;
 
                 foreach($data as $item){
-                    if($line>1){
+                    $line++;
+                    if($line>500){
                         if ($item[0] != '') {
+                            $matricula = trim($item[0]);
 
-                            $arraySeries = [$item[2]];
-                            $series = [];
+                            $cargo = trim($item[1]);
+                            $cargoBanco = Cargo::query()->where('tbcargos_descricao', $cargo)->select(['tbcargos_id'])->first();
 
-                            foreach($arraySeries as $serie) {
-                                switch (trim($serie)) {
-                                    case '1º Ano':
-                                        $serie = 1;
-                                        break;
-                                    case '2º Ano':
-                                        $serie = 2;
-                                        break;
-                                    case '3º Ano':
-                                        $serie = 3;
-                                        break;
-                                    case '4º Ano':
-                                        $serie = 4;
-                                        break;
-                                    case '5º Ano':
-                                        $serie = 5;
-                                        break;
-                                }
-                                if ($serie != null) {
-                                    array_push($series, $serie);
+                            $data =  str_replace('/', '-', $item[6]);
+                            $dataNasc = date('Y-m-d', strtotime($data));
+
+                            if ($cargoBanco != null) {
+                                $funcionario = Funcionario::query()->where('tbfuncionarios_matricula', $matricula)->select([
+                                    'tbpessoas_id'
+                                ])->first();
+
+                                if ($funcionario != null) {
+                                    Funcionario::query()->where('tbfuncionarios_matricula', $matricula)->update([
+                                        'tbcargos_id' => $cargoBanco->tbcargos_id
+                                    ]);
+
+                                    Pessoa::query()->where('tbpessoas_id', $funcionario->tbpessoas_id)->update([
+                                        'tbpessoas_dataNasc' => $dataNasc
+                                    ]);
+
                                 }
                             }
 
-                            // dump($item);
-
-                            $series = array_map( function ($serie) {
-                                return $serie;
-                            }, $series);
-
-                            $bncc = $this->bncc->firstOrCreate([
-                                'mapa_turma'                => 1,
-                                'tipo_bncc'                 => 1,
-                                'disciplina'                => 1,
-                                'componente'                => 'Língua Portuguesa',
-                                'ano_faixa'                 => trim($item[2]),
-                                'campos_de_atuacao'         => null,
-                                'praticas_de_linguagem'     => trim($item[0]),
-                                'objetos_de_conhecimento'   => null,
-                                'habilidades'               => trim($item[1]),
-                            ]);
-                            $bncc->bnccSeries()->sync($series);
-                            
-                            $created++;
+                            dump($line .' - '. $matricula);
                         }
                     }
-                    $line++;
                 }
-                // dd('oi');
+
+                // dd($line);
+                dd('finalizado!');
             }
         }
         $notification = [

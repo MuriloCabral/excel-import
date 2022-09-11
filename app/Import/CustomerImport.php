@@ -5,6 +5,7 @@ namespace App\Import;
 use App\Models\Customer;
 use App\Models\Bncc;
 use App\Models\Cargo;
+use App\Models\Escola;
 use App\Models\FuncaoLaboral;
 use App\Models\Funcionario;
 use App\Models\Pessoa;
@@ -41,39 +42,26 @@ class CustomerImport
 
                 foreach($data as $item){
                     $line++;
-                    if($line>500){
+                    if($line > 499 && $line <= 1000){ //
                         if ($item[0] != '') {
                             $matricula = trim($item[0]);
+                            $disciplina = trim(ucfirst(mb_strtolower($item[2], 'UTF-8')));
+                            $escola = explode(".", $item[4]);
+                            $dias = $item[8];
+                            $qtde_filhos = $item[7];
 
-                            $cargo = trim($item[1]);
-                            $cargoBanco = Cargo::query()->where('tbcargos_descricao', $cargo)->select(['tbcargos_id'])->first();
+                            $diasPontos = $dias * 0.005;
+                            if ($diasPontos > 5) $diasPontos = 5;
 
-                            $data =  str_replace('/', '-', $item[6]);
-                            $dataNasc = date('Y-m-d', strtotime($data));
+                            $pontos = $diasPontos + $item[10] + $item[11] + $item[12] + $item[13] + $item[14];
 
-                            if ($cargoBanco != null) {
-                                $funcionario = Funcionario::query()->where('tbfuncionarios_matricula', $matricula)->select([
-                                    'tbpessoas_id'
-                                ])->first();
+                                                        
 
-                                if ($funcionario != null) {
-                                    Funcionario::query()->where('tbfuncionarios_matricula', $matricula)->update([
-                                        'tbcargos_id' => $cargoBanco->tbcargos_id
-                                    ]);
-
-                                    Pessoa::query()->where('tbpessoas_id', $funcionario->tbpessoas_id)->update([
-                                        'tbpessoas_dataNasc' => $dataNasc
-                                    ]);
-
-                                }
-                            }
-
-                            dump($line .' - '. $matricula);
+                            dump($line .' - '. $pontos);
                         }
                     }
                 }
 
-                // dd($line);
                 dd('finalizado!');
             }
         }

@@ -42,7 +42,7 @@ class CustomerImport
 
                 foreach($data as $item){
                     $line++;
-                    if($line > 499 && $line <= 1000){ //
+                    if($line > 1 && $line <= 400){ //
                         if ($item[0] != '') {
                             $matricula = trim($item[0]);
                             $disciplina = trim(ucfirst(mb_strtolower($item[2], 'UTF-8')));
@@ -55,7 +55,16 @@ class CustomerImport
 
                             $pontos = $diasPontos + $item[10] + $item[11] + $item[12] + $item[13] + $item[14];
 
-                                                        
+                            $funcionario = Funcionario::query()->select(['tbfuncionarios_id'])->where('tbfuncionarios_matricula', $matricula)->first();
+
+                            $dados = [
+                                'ano'               => 2022,
+                                'dias_tabalhados'   => $dias,
+                                'acumulado'         => $dias,
+                                'tbfuncionarios_id' => $funcionario->tbfuncionarios_id,
+                                'sede_id'           => $funcionario->tbfuncionarios_id,
+                                'lotacao_id'        => $funcionario->tbfuncionarios_id,
+                            ];
 
                             dump($line .' - '. $pontos);
                         }

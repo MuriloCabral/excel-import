@@ -5,7 +5,7 @@ namespace App\Import;
 use App\Models\Customer;
 use App\Models\Bncc;
 use App\Models\Cargo;
-use App\Models\FrequenciaFuncionarioConsolidado;
+use App\Models\Escola;
 use App\Models\FuncaoLaboral;
 use App\Models\Funcionario;
 use App\Models\Pessoa;
@@ -42,18 +42,26 @@ class CustomerImport
 
                 foreach($data as $item){
                     $line++;
-                    if($line>0){
+                    if($line > 499 && $line <= 1000){ //
                         if ($item[0] != '') {
                             $matricula = trim($item[0]);
+                            $disciplina = trim(ucfirst(mb_strtolower($item[2], 'UTF-8')));
+                            $escola = explode(".", $item[4]);
+                            $dias = $item[8];
+                            $qtde_filhos = $item[7];
 
-                            // $consolidado = FrequenciaFuncionarioConsolidado::query()->where()
+                            $diasPontos = $dias * 0.005;
+                            if ($diasPontos > 5) $diasPontos = 5;
 
-                            dump($line .' - '. $matricula);
+                            $pontos = $diasPontos + $item[10] + $item[11] + $item[12] + $item[13] + $item[14];
+
+
+
+                            dump($line .' - '. $pontos);
                         }
                     }
                 }
 
-                // dd($line);
                 dd('finalizado!');
             }
         }

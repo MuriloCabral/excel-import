@@ -5,7 +5,6 @@ namespace App\Import;
 use App\Models\Customer;
 use App\Models\Bncc;
 use App\Models\Cargo;
-use App\Models\FrequenciaFuncionarioConsolidado;
 use App\Models\FuncaoLaboral;
 use App\Models\Funcionario;
 use App\Models\Pessoa;
@@ -46,7 +45,28 @@ class CustomerImport
                         if ($item[0] != '') {
                             $matricula = trim($item[0]);
 
-                            // $consolidado = FrequenciaFuncionarioConsolidado::query()->where()
+                            $cargo = trim($item[1]);
+                            $cargoBanco = Cargo::query()->where('tbcargos_descricao', $cargo)->select(['tbcargos_id'])->first();
+
+                            $data =  str_replace('/', '-', $item[6]);
+                            $dataNasc = date('Y-m-d', strtotime($data));
+
+                            if ($cargoBanco != null) {
+                                $funcionario = Funcionario::query()->where('tbfuncionarios_matricula', $matricula)->select([
+                                    'tbpessoas_id'
+                                ])->first();
+
+                                if ($funcionario != null) {
+                                    Funcionario::query()->where('tbfuncionarios_matricula', $matricula)->update([
+                                        'tbcargos_id' => $cargoBanco->tbcargos_id
+                                    ]);
+
+                                    Pessoa::query()->where('tbpessoas_id', $funcionario->tbpessoas_id)->update([
+                                        'tbpessoas_dataNasc' => $dataNasc
+                                    ]);
+
+                                }
+                            }
 
                             dump($line .' - '. $matricula);
                         }

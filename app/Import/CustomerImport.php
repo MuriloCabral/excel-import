@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Bncc;
 use App\Models\Cargo;
 use App\Models\Escola;
+use App\Models\FrequenciaFuncionarioConsolidado;
 use App\Models\FuncaoLaboral;
 use App\Models\Funcionario;
 use App\Models\Pessoa;
@@ -33,7 +34,7 @@ class CustomerImport
 
         $sheetCount = $read->getSheetCount();
         for ($i = 0; $i < $sheetCount; $i++) {
-            if ($i == 1) {
+            if ($i == 0) {
                 $data = $read->getSheet($i)->toArray();
 
                 $line=0;
@@ -42,31 +43,25 @@ class CustomerImport
 
                 foreach($data as $item){
                     $line++;
-                    if($line > 1 && $line <= 400){ //
+                    if($line > 1){ // && $line <= 500
                         if ($item[0] != '') {
                             $matricula = trim($item[0]);
-                            $disciplina = trim(ucfirst(mb_strtolower($item[2], 'UTF-8')));
-                            $escola = explode(".", $item[4]);
-                            $dias = $item[8];
-                            $qtde_filhos = $item[7];
-
-                            $diasPontos = $dias * 0.005;
-                            if ($diasPontos > 5) $diasPontos = 5;
-
-                            $pontos = $diasPontos + $item[10] + $item[11] + $item[12] + $item[13] + $item[14];
+                            $diasAcumulados = $item[5];
 
                             $funcionario = Funcionario::query()->select(['tbfuncionarios_id'])->where('tbfuncionarios_matricula', $matricula)->first();
 
-                            $dados = [
-                                'ano'               => 2022,
-                                'dias_tabalhados'   => $dias,
-                                'acumulado'         => $dias,
-                                'tbfuncionarios_id' => $funcionario->tbfuncionarios_id,
-                                'sede_id'           => $funcionario->tbfuncionarios_id,
-                                'lotacao_id'        => $funcionario->tbfuncionarios_id,
-                            ];
+                            if ($funcionario != null) {
+                                $dados = [
+                                    'acumulado' => $diasAcumulados,
+                                ];
+                                FrequenciaFuncionarioConsolidado::query()
+                                    ->where('tbfuncionarios_id', $funcionario->tbfuncionarios_id)
+                                    ->where('ano', 2022)
+                                    ->update($dados);
+                            }
 
-                            dump($line .' - '. $pontos);
+                            // dd($item);
+                            // dump($line .' - '. $matricula);
                         }
                     }
                 }

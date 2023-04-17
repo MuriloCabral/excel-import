@@ -1,0 +1,153 @@
+<?php
+
+namespace App\Import;
+
+use App\Models\BaseCurricular;
+use App\Models\Inscricao;
+use App\Models\Customer;
+use App\Models\Bncc;
+use App\Models\Cargo;
+use App\Models\Escola;
+use App\Models\FrequenciaFuncionarioConsolidado;
+use App\Models\FuncaoLaboral;
+use App\Models\Funcionario;
+use App\Models\InscricaoEscola;
+use App\Models\Pessoa;
+use App\Tools\Sanitize;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+
+set_time_limit(0);
+class CustomerImport
+{
+    protected $funcionario;
+    protected $sanatize;
+
+    public function allData(Request $request)
+    {
+        $read = IOFactory::load($request->file);
+        $sheetCount = $read->getSheetCount();
+
+
+        for ($i = 0; $i < $sheetCount; $i++) {
+            if ($i == 0) {
+                $data = $read->getSheet($i)->toArray();
+                $line=0;
+                $cargosNaoCadastrados = [];
+                $funcoesNaoCadastrados = [];
+
+                foreach($data as $item){
+                    $line++;
+
+                    if($line > 2){
+                        if ($item[1] != '') {
+                            // Log::debug('Linha: ' . $line);
+
+                            $matricula = trim($item[1]);
+                            $cargo = trim($item[3]);
+                            $funcao = trim($item[4]);
+
+                            $cargo = match($cargo) {
+                                'Diretor Escolar' => 'Diretor(a)',
+                                'Diretora de Departamento' => 'Diretor(a) de Departamento',
+                                default => $cargo,
+                            };
+                            // $buscaCargo = Cargo::query()
+                            //     ->where('tbcargos_descricao', $cargo)
+                            //     ->first();
+                            // if (!$buscaCargo) {
+                            //     if (!in_array($cargo, $cargosNaoCadastrados)) {
+                            //         $cargosNaoCadastrados[] = $cargo;
+                                    // Cargo::firstOrCreate(
+                                    //     ['tbcargos_descricao' => $cargo],
+                                    //     [
+                                    //         'tbcargos_descricao' => $cargo,
+                                    //         'tbcargos_ativo' => 'S',
+                                    //         'tbcargos_tipo' => 'F',
+                                    //     ]
+                                    // );
+                            //     }
+                            // }
+
+                            $funcao = match($funcao) {
+                                'a mesma' => FuncaoLaboral::where('tbfuncoes_laborais_descricao', $cargo)->first()?->tbfuncoes_laborais_descricao ? FuncaoLaboral::where('tbfuncoes_laborais_descricao', $cargo)->first()?->tbfuncoes_laborais_descricao : $cargo,
+                                'A mesma' => FuncaoLaboral::where('tbfuncoes_laborais_descricao', $cargo)->first()?->tbfuncoes_laborais_descricao ? FuncaoLaboral::where('tbfuncoes_laborais_descricao', $cargo)->first()?->tbfuncoes_laborais_descricao : $cargo,
+                                'a mesmo' => FuncaoLaboral::where('tbfuncoes_laborais_descricao', $cargo)->first()?->tbfuncoes_laborais_descricao ? FuncaoLaboral::where('tbfuncoes_laborais_descricao', $cargo)->first()?->tbfuncoes_laborais_descricao : $cargo,
+                                'a memsa' => FuncaoLaboral::where('tbfuncoes_laborais_descricao', $cargo)->first()?->tbfuncoes_laborais_descricao ? FuncaoLaboral::where('tbfuncoes_laborais_descricao', $cargo)->first()?->tbfuncoes_laborais_descricao : $cargo,
+                                'A MESMA' => FuncaoLaboral::where('tbfuncoes_laborais_descricao', $cargo)->first()?->tbfuncoes_laborais_descricao ? FuncaoLaboral::where('tbfuncoes_laborais_descricao', $cargo)->first()?->tbfuncoes_laborais_descricao : $cargo,
+
+                                'Gestor de -Setor' => 'Gestor de Setor',
+                                'Diretora Escolar  III' => 'Diretora Escolar III',
+                                'Diretora de Procedimentos Judiciais.' => 'Diretora de Procedimentos Judiciais',
+                                'Gestor de Unidade -Setor 01' => 'Gestor de Unidade Setor I',
+                                'Função Gratificada Psicologa' => 'Função Gratificada Psicóloga',
+                                'Gestor de  Setor' => 'Gestor de Setor',
+                                'Gestor de Unidade -Setor 10' => 'Gestor de Unidade Setor 10',
+                                'Monitoria do Onibus' => 'Monitoria do Ônibus',
+                                'Coordenador Pedagogico IV' => 'Coordenador Pedagógico IV',
+                                'a' => null,
+                                default => $funcao,
+                            };
+
+                            // $buscaFuncao = FuncaoLaboral::query()
+                            //     ->where('tbfuncoes_laborais_descricao', $funcao)
+                            //     ->first();
+
+                            // if (!$buscaFuncao) {
+                            //     if (!in_array($funcao, $funcoesNaoCadastrados)) {
+                            //         $funcoesNaoCadastrados[] = $funcao;
+                            //         if ($funcao != null) {
+                            //             FuncaoLaboral::firstOrCreate(
+                            //                 ['tbfuncoes_laborais_descricao' => $funcao],
+                            //                 ['tbfuncoes_laborais_descricao' => $funcao]
+                            //             );
+                            //         }
+                            //     }
+                            // }
+
+                            $cargo = Cargo::query()
+                                ->where('tbcargos_descricao', $cargo)
+                                ->first();
+
+                            $funcao = FuncaoLaboral::query()
+                                ->where('tbfuncoes_laborais_descricao', $funcao)
+                                ->first();
+
+                            if ($cargo && $funcao) {
+                                $funcionario = Funcionario::query()
+                                    ->where('tbfuncionarios_matricula', $matricula)
+                                    ->first();
+
+                                if ($funcionario) {
+                                    $funcionario->update([
+                                        'tbcargos_id'           => $cargo->tbcargos_id,
+                                        'tbfuncoes_laborais_id' => $funcao->tbfuncoes_laborais_id,
+                                    ]);
+                                    Log::debug('Cargo e Função atualizado! Matrícula: ' . $matricula . ' Linha: ' . $line);
+                                } else {
+                                    Log::debug('Funcionário não cadastrado! Matrícula: ' . $matricula . ' Linha: ' . $line);
+                                }
+                            } else {
+                                Log::debug('Cargo ou Função não cadastrado! Matrícula: ' . $matricula . ' Linha: ' . $line);
+                                // dd($line);
+                            }
+                        }
+                    }
+                }
+                Log::debug('Finalizado!');
+
+                // dd($cargosNaoCadastrados);
+
+                dd('Fim! Linhas = ' . $line);
+            }
+        }
+        $notification = [
+            'message'=> "worksheet_imported",
+        ];
+    }
+}

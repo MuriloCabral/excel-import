@@ -1,0 +1,181 @@
+<?php
+
+namespace App\Import;
+
+use App\Models\BaseCurricular;
+use App\Models\Inscricao;
+use App\Models\Customer;
+use App\Models\Bncc;
+use App\Models\Cargo;
+use App\Models\Escola;
+use App\Models\FrequenciaFuncionarioConsolidado;
+use App\Models\FuncaoLaboral;
+use App\Models\Funcionario;
+use App\Models\InscricaoEscola;
+use App\Models\Pessoa;
+use App\Tools\Sanitize;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Web64\LaravelNlp\Facades\NLP;
+
+// use NlpTools\Tokenizers\WhitespaceTokenizer;
+// use NlpTools\Tokenizers\RegexTokenizer;
+// use NlpTools\Tokenizers\NGramTokenizer;
+// use NlpTools\Tokenizers\WhitespaceAndPunctuationTokenizer;
+
+use Spatie\String\Str;
+
+use Phpml\Tokenization\NGramTokenizer;
+use Phpml\Tokenization\NGramWordTokenizer;
+use Phpml\Tokenization\WhitespaceTokenizer;
+use Phpml\FeatureExtraction\TfIdfTransformer;
+use Phpml\FeatureExtraction\TokenCountVectorizer;
+
+set_time_limit(0);
+class CustomerImport
+{
+    protected $funcionario;
+    protected $sanatize;
+
+    public function allData(Request $request)
+    {
+        $read = IOFactory::load($request->file);
+        $sheetCount = $read->getSheetCount();
+
+
+        for ($i = 0; $i < $sheetCount; $i++) {
+            if ($i == 0) {
+                $data = $read->getSheet($i)->toArray();
+                $line=0;
+
+                foreach($data as $item){
+                    $line++;
+                    $escolaId = 0;
+
+                    if($line > 1){
+                        if ($item[0] != '') {
+
+                            $disciplina = trim($item[5]);
+
+                            if ($disciplina == null) dd($line);
+
+                            // LINGUA PORTUGUESA & LINGUA INGLESA
+                            if ($disciplina == 1 || $disciplina == 8) {
+                                $campoAtuacao           = trim(str_replace("- ", "", str_replace("\n", " ", $item[0])));
+                                $ano                    = trim(str_replace("- ", "", str_replace("º", "°", str_replace(" E ", ";", $item[1]))));
+                                $praticasLinguagem      = trim(str_replace("- ", "", str_replace("\n", " ", $item[2])));
+                                $habilidade             = trim(str_replace("- ", "", str_replace("\n", " ", $item[3])));
+                                $objetosConhecimento    = trim(str_replace("- ", "", str_replace("\n", " ", $item[4])));
+
+                                $codigo = trim(str_replace("\n", " ", $item[3]));
+
+                            } else {
+                                $campoAtuacao           = trim(str_replace("- ", "", str_replace("\n", " ", $item[0])));
+                                $ano                    = trim(str_replace("- ", "", str_replace("º", "°", str_replace(" E ", ";", $item[1]))));
+                                $habilidade             = trim(str_replace("- ", "", str_replace("\n", " ", $item[2])));
+                                $objetosConhecimento    = trim(str_replace("- ", "", str_replace("\n", " ", $item[3])));
+                                $objetosConhecimento    = trim(str_replace("- ", "", str_replace("\n", " ", $item[3])));
+                                $disciplina             = trim($item[5]);
+
+                                $praticasLinguagem      = null;
+
+                                $codigo = trim(str_replace("\n", " ", $item[2]));
+
+                            }
+
+                            $componente = match($disciplina) {
+                                '1' => 'Língua Portuguesa',
+                                '2' => 'História',
+                                '3' => 'Geografia',
+                                '4' => 'Matemática',
+                                '5' => 'Ciências',
+                                '6' => 'Educação Física',
+                                '7' => 'Arte',
+                                '8' => 'Inglês',
+                                default     => dd($disciplina),
+                            };
+
+                            $anos = match($ano) {
+                                '1°' => [1],
+                                '2°' => [2],
+                                '3°' => [3],
+                                '4°' => [4],
+                                '5°' => [5],
+                                '6°' => [6],
+                                '7°' => [7],
+                                '8°' => [8],
+                                '9°' => [9],
+                                '1°;2°'         => [1, 2],
+                                '1º E 2º'       => [1, 2],
+                                '3°, 4°, 5°'    => [3, 4, 5],
+                                '3º, 4º, 5º'    => [3, 4, 5],
+                                '1° AO 5°'      => [1, 2, 3, 4, 5],
+                                '1º AO 5º'      => [1, 2, 3, 4, 5],
+                                '1° ao 5°'      => [1, 2, 3, 4, 5],
+                                '6° ao 9°'      => [6, 7, 8, 9],
+                                '6º ao 9º'      => [6, 7, 8, 9],
+                                '6°, 7°'        => [6, 7],
+                                '6º, 7º'        => [6, 7],
+                                '8°, 9°'        => [8, 9],
+                                '8º, 9º'        => [8, 9],
+                                default         => dd($ano),
+                            };
+
+                            if ($anos[0] < 6) {
+                                $etapa = 'Fundamental 1';
+                            }
+                            if ($anos[0] >= 6) {
+                                $etapa = 'Fundamental 2';
+                            }
+
+                            $inicioCod = strpos($codigo, '(') + 1;
+                            $fimCod = strpos($codigo, ')');
+                            $codigo = substr($codigo, $inicioCod, $fimCod - $inicioCod);
+
+                            $dados = [
+                                'disciplina'            => $disciplina,
+                                'origem'                => 'Currículo Paulista',
+                                'etapa'                 => $etapa,
+                                'ativo'                 => true,
+                                'componente'            => $componente,
+                                'campo_atuacao'         => $campoAtuacao,
+                                'pratica_linguagem'     => $praticasLinguagem,
+                                'ano_faixa'             => $ano,
+                                'codigo'                => $codigo,
+                                'habilidade'            => $habilidade,
+                                'objeto_conhecimento'   => $objetosConhecimento,
+                            ];
+
+                            // dump($dados);
+
+                            $baseCurricular = BaseCurricular::updateOrCreate(
+                                ['codigo' => $codigo],
+                                $dados
+                            );
+                            $baseCurricular->anoSeries()->sync($anos);
+
+                            Log::debug($baseCurricular->tbbase_curricular_id .' => '. $item[0] . ' cadastrada!');
+
+                            $habilidades = explode('.', $habilidade);
+                            if (count($habilidades) > 2) {
+                                dump($habilidades);
+                                // dump($item[3]);
+                            }
+                        }
+                    }
+                }
+
+                dd('Fim! Linhas = ' . $line);
+                Log::debug('Finalizado!');
+            }
+        }
+        $notification = [
+            'message'=> "worksheet_imported",
+        ];
+    }
+}

@@ -1,0 +1,86 @@
+<?php
+
+namespace App\Import;
+
+use App\Models\BaseCurricular;
+use App\Models\Inscricao;
+use App\Models\Customer;
+use App\Models\Bncc;
+use App\Models\Cargo;
+use App\Models\Escola;
+use App\Models\FrequenciaFuncionarioConsolidado;
+use App\Models\FuncaoLaboral;
+use App\Models\Funcionario;
+use App\Models\InscricaoEscola;
+use App\Models\Pessoa;
+use App\Models\ProcessoSeletivoExterno\ProcessoSeletivoExterno;
+use App\Tools\Sanitize;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+
+set_time_limit(0);
+class CustomerImport
+{
+    protected $funcionario;
+    protected $sanatize;
+
+    public function allData(Request $request)
+    {
+        $read = IOFactory::load($request->file);
+        $sheetCount = $read->getSheetCount();
+
+
+        for ($i = 0; $i < $sheetCount; $i++) {
+            if ($i == 0) {
+                $data = $read->getSheet($i)->toArray();
+                $line=0;
+
+                $count = 0;
+
+                foreach($data as $item){
+                    $line++;
+
+                    // if ($line > 310) {
+                    //     if ($item[0] != '') {
+                    //         // dd($item);
+                    //         $nome = trim($item[1]);
+                    //         $nota = trim($item[2]);
+
+                    //         $processo = ProcessoSeletivoExterno::query()
+                    //             ->where('nome', $nome)
+                    //             ->where('ano', 2023)
+                    //             ->first();
+                    //         if (!$processo) {
+                    //             Log::debug('Processo não encontrado: ' . $nome);
+                    //         } else {
+                    //             $dados = [
+                    //                 'processo_seletivo_externo_prova_status' => 'PRESENTE',
+                    //                 'processo_seletivo_externo_prova_nota' => $nota,
+                    //             ];
+                    //             if ($nota) {
+                    //                 $processo->update($dados);
+                    //             }
+                    //         }
+
+                    //         Log::debug($line);
+                    //     }
+                    // }
+                }
+
+                // dd('Fim! Linhas = ' . $line);
+                Log::debug('Finalizado!');
+                dump($line);
+                dump($count);
+                dd('Fim');
+            }
+        }
+        $notification = [
+            'message'=> "worksheet_imported",
+        ];
+    }
+}

@@ -1,0 +1,225 @@
+<?php
+
+namespace App\Import;
+
+use App\Models\BaseCurricular;
+use App\Models\Inscricao;
+use App\Models\Customer;
+use App\Models\Bncc;
+use App\Models\Cargo;
+use App\Models\Escola;
+use App\Models\FrequenciaFuncionarioConsolidado;
+use App\Models\FuncaoLaboral;
+use App\Models\Funcionario;
+use App\Models\InscricaoEscola;
+use App\Models\Pessoa;
+use App\Tools\Sanitize;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+
+set_time_limit(0);
+class CustomerImport
+{
+    protected $funcionario;
+    protected $sanatize;
+
+    public function allData(Request $request)
+    {
+        $read = IOFactory::load($request->file);
+        $sheetCount = $read->getSheetCount();
+
+
+        for ($i = 0; $i < $sheetCount; $i++) {
+            if ($i == 0) {
+                $data = $read->getSheet($i)->toArray();
+                $line=0;
+
+                $count = 0;
+
+                foreach($data as $item){
+                    $line++;
+
+                    // INFANTIL
+                    // if ($item != '') {
+                    //     foreach ($item as $habilidade) {
+
+                    //         $inicioCod = strpos($habilidade, '(') + 1;
+                    //         $fimCod = strpos($habilidade, ')');
+                    //         $codigo = substr($habilidade, $inicioCod, $fimCod - $inicioCod);
+
+                    //         if ($codigo) {
+                    //             $count++;
+                    //             $codigoArray = str_split($codigo, 2);
+
+                    //             $faixa = match($codigoArray[1]) {
+                    //                 '01' => 'Bebês (Zero a 1 ano e 6 meses)',
+                    //                 '02' => 'Crianças Bem Pequenas (1 ano e 7 meses a 3 anos e 11 meses)',
+                    //                 'O2' => 'Crianças Bem Pequenas (1 ano e 7 meses a 3 anos e 11 meses)',
+                    //                 '03' => 'Crianças Pequenas (4 anos a 5 anos e 11 meses)',
+                    //                 'O3' => 'Crianças Pequenas (4 anos a 5 anos e 11 meses)',
+                    //                 default => dd($codigoArray[1])
+                    //             };
+
+                    //             $componente = match ($codigoArray[2]) {
+                    //                 'EO' => 'O eu, o outro e o nós',
+                    //                 'CG' => 'Corpo, gestos e movimentos',
+                    //                 'TS' => 'Traços, sons, cores e formas',
+                    //                 'EF' => 'Escuta, fala, pensamento e imaginação',
+                    //                 'ET' => 'Espaços, tempos, quantidades, relações e transformações',
+                    //                 default => dd($codigoArray[2])
+                    //             };
+
+                    //             $dados = [
+                    //                 'origem' => 'Currículo Paulista',
+                    //                 'etapa' => 'Infantil',
+                    //                 'mapa_turma' => false,
+                    //                 'ativo' => true,
+                    //                 'componente' => $componente,
+                    //                 'ano_faixa' => $faixa,
+                    //                 'codigo' => $codigo,
+                    //                 'habilidade' => trim(str_replace("- ", "", str_replace("\n", " ", $habilidade))),
+                    //             ];
+
+                    //             dump($dados);
+
+                    //             $baseCurricular = BaseCurricular::updateOrCreate(
+                    //                 [
+                    //                     'codigo' => $codigo,
+                    //                     'origem' => 'Currículo Paulista'
+                    //                 ],
+                    //                 $dados
+                    //             );
+                    //         }
+                    //     }
+                    // }
+
+                    // FUNDAMENTAL
+                    // if($line > 1){
+                    //     if ($item[0] != '') {
+
+                    //         $disciplina = trim($item[5]);
+
+                    //         if ($disciplina == null) dd($line);
+
+                    //         // LINGUA PORTUGUESA & LINGUA INGLESA
+                    //         if ($disciplina == 1 || $disciplina == 8) {
+                    //             $campoAtuacao           = trim(str_replace("- ", "", str_replace("\n", " ", $item[0])));
+                    //             $ano                    = trim(str_replace("- ", "", str_replace("º", "°", str_replace(" E ", ";", $item[1]))));
+                    //             $praticasLinguagem      = trim(str_replace("- ", "", str_replace("\n", " ", $item[2])));
+                    //             $habilidade             = trim(str_replace("- ", "", str_replace("\n", " ", $item[3])));
+                    //             $objetosConhecimento    = trim(str_replace("- ", "", str_replace("\n", " ", $item[4])));
+
+                    //             $codigo = trim(str_replace("\n", " ", $item[3]));
+
+                    //         } else {
+                    //             $campoAtuacao           = trim(str_replace("- ", "", str_replace("\n", " ", $item[0])));
+                    //             $ano                    = trim(str_replace("- ", "", str_replace("º", "°", str_replace(" E ", ";", $item[1]))));
+                    //             $habilidade             = trim(str_replace("- ", "", str_replace("\n", " ", $item[2])));
+                    //             $objetosConhecimento    = trim(str_replace("- ", "", str_replace("\n", " ", $item[3])));
+                    //             $objetosConhecimento    = trim(str_replace("- ", "", str_replace("\n", " ", $item[3])));
+                    //             $disciplina             = trim($item[5]);
+
+                    //             $praticasLinguagem      = null;
+
+                    //             $codigo = trim(str_replace("\n", " ", $item[2]));
+
+                    //         }
+
+                    //         $componente = match($disciplina) {
+                    //             '1' => 'Língua Portuguesa',
+                    //             '2' => 'História',
+                    //             '3' => 'Geografia',
+                    //             '4' => 'Matemática',
+                    //             '5' => 'Ciências',
+                    //             '6' => 'Educação Física',
+                    //             '7' => 'Arte',
+                    //             '8' => 'Inglês',
+                    //             default     => dd($disciplina),
+                    //         };
+
+                    //         $anos = match($ano) {
+                    //             '1°' => [1],
+                    //             '2°' => [2],
+                    //             '3°' => [3],
+                    //             '4°' => [4],
+                    //             '5°' => [5],
+                    //             '6°' => [6],
+                    //             '7°' => [7],
+                    //             '8°' => [8],
+                    //             '9°' => [9],
+                    //             '1°;2°'         => [1, 2],
+                    //             '1º E 2º'       => [1, 2],
+                    //             '3°, 4°, 5°'    => [3, 4, 5],
+                    //             '3º, 4º, 5º'    => [3, 4, 5],
+                    //             '1° AO 5°'      => [1, 2, 3, 4, 5],
+                    //             '1º AO 5º'      => [1, 2, 3, 4, 5],
+                    //             '1° ao 5°'      => [1, 2, 3, 4, 5],
+                    //             '6° ao 9°'      => [6, 7, 8, 9],
+                    //             '6º ao 9º'      => [6, 7, 8, 9],
+                    //             '6°, 7°'        => [6, 7],
+                    //             '6º, 7º'        => [6, 7],
+                    //             '8°, 9°'        => [8, 9],
+                    //             '8º, 9º'        => [8, 9],
+                    //             default         => dd($ano),
+                    //         };
+
+                    //         if ($anos[0] < 6) {
+                    //             $etapa = 'Fundamental 1';
+                    //         }
+                    //         if ($anos[0] >= 6) {
+                    //             $etapa = 'Fundamental 2';
+                    //         }
+
+                    //         $inicioCod = strpos($codigo, '(') + 1;
+                    //         $fimCod = strpos($codigo, ')');
+                    //         $codigo = substr($codigo, $inicioCod, $fimCod - $inicioCod);
+
+                    //         $dados = [
+                    //             'disciplina'            => $disciplina,
+                    //             'origem'                => 'Currículo Paulista',
+                    //             'etapa'                 => $etapa,
+                    //             'ativo'                 => true,
+                    //             'componente'            => $componente,
+                    //             'campo_atuacao'         => $campoAtuacao,
+                    //             'pratica_linguagem'     => $praticasLinguagem,
+                    //             'ano_faixa'             => $anos,
+                    //             'codigo'                => $codigo,
+                    //             'habilidade'            => $habilidade,
+                    //             'objeto_conhecimento'   => $objetosConhecimento,
+                    //         ];
+
+                    //         // dump($dados);
+
+                    //         $baseCurricular = BaseCurricular::updateOrCreate(
+                    //             ['codigo' => $codigo],
+                    //             $dados
+                    //         );
+                    //         $baseCurricular->anoSeries()->sync($anos);
+
+                    //         // Log::debug($baseCurricular->tbbase_curricular_id .' => '. $codigo . ' cadastrada!');
+
+                    //         // $habilidades = explode('.', $habilidade);
+                    //         // if (count($habilidades) > 2) {
+                    //         //     dump($habilidades);
+                    //         //     // dump($item[3]);
+                    //         // }
+                    //     }
+                    // }
+                }
+
+                // dd('Fim! Linhas = ' . $line);
+                Log::debug('Finalizado!');
+                dump($count);
+                dd('Fim');
+            }
+        }
+        $notification = [
+            'message'=> "worksheet_imported",
+        ];
+    }
+}
